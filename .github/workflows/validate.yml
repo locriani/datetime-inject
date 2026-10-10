@@ -1,0 +1,43 @@
+name: validate
+
+# Push only. A fork cannot push a branch here, so this workflow never runs a fork's code.
+on:
+  push:
+
+# Validation only reads the repository.
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      # v4.4.0, pinned to its commit: a tag can be moved.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # Nothing after the checkout uses the token, so it is not left in .git/config.
+          persist-credentials: false
+      # Every JSON manifest must parse.
+      - name: JSON manifests parse
+        run: |
+          set -eu
+          for f in $(find . -name '*.json' -not -path './.git/*'); do
+            python3 -m json.tool "$f" > /dev/null
+          done
+      # Python sources compile (none today; the step keeps future hooks honest).
+      - name: Python sources compile
+        run: |
+          set -eu
+          files=$(find . -name '*.py' -not -path './.git/*')
+          if [ -n "$files" ]; then
+            echo "$files" | xargs python3 -m py_compile
+          else
+            echo 'no python files'
+          fi
+      # Shell scripts must parse under bash -n.
+      - name: Shell scripts pass bash -n
+        run: |
+          set -eu
+          for f in $(find . -name '*.sh' -not -path './.git/*'); do
+            bash -n "$f"
+          done
